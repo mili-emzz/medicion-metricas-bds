@@ -13,6 +13,9 @@ data/dataset.json
 data/*.jsonl
 *.dump
 config
+/docs
+estado_proyecto.json
+plan_automatizacion_windows.md
 
 # Docker volumes locales
 mongo_data/

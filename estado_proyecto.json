@@ -6,7 +6,23 @@
     "rama_principal": "main",
     "dominio_datos": "ecommerce_modular",
     "ruta_dataset_generado": "./data/dataset.json",
-    "fecha_actualizacion": "2026-10-27"
+    "fecha_actualizacion": "2026-10-28",
+    "dominio_seleccionado": "antfish_security_analysis",
+    "coleccion_objetivo": "analisis",
+    "fuente_esquema": "docs/init_antfish_db.js",
+    "decisiones_diseno_benchmark": {
+      "justificacion_coleccion": "Se seleccionó la colección 'analisis' del dominio AntFish porque posee la estructura anidada y de subdocumentos más rica (urls_extraidas, puntos_por_capa, score_total, hallazgos, recomendaciones) y carece de índices sobre los campos agregados, cumpliendo a cabalidad con los requisitos de estrés de CPU y memoria del Playbook.",
+      "consulta_q1_cpu_saturation": {
+        "descripcion": "Desanidamiento del arreglo 'urls_extraidas', filtrado por score_total >= 50 y agregación multidimensional (conteo, promedio de score y promedio de puntos de APIs) agrupada por tipo_entrada, nivel_riesgo y dominio.",
+        "mongo_pipeline": "[{ '$unwind': '$urls_extraidas' }, { '$match': { 'score_total': { '$gte': 50 } } }, { '$group': { '_id': { 'tipo_entrada': '$tipo_entrada', 'nivel_riesgo': '$nivel_riesgo', 'dominio': '$urls_extraidas.dominio' }, 'total_amenazas': { '$sum': 1 }, 'promedio_score': { '$avg': '$score_total' }, 'promedio_puntos_apis': { '$avg': '$puntos_por_capa.apis' } } }]",
+        "postgres_sql": "SELECT data->>'tipo_entrada' AS tipo_entrada, data->>'nivel_riesgo' AS nivel_riesgo, url_obj->>'dominio' AS dominio, COUNT(*) AS total_amenazas, AVG((data->>'score_total')::numeric) AS promedio_score, AVG((data->'puntos_por_capa'->>'apis')::numeric) AS promedio_puntos_apis FROM analisis, jsonb_array_elements(data->'urls_extraidas') AS url_obj WHERE (data->>'score_total')::numeric >= 50 GROUP BY 1, 2, 3;"
+      },
+      "consulta_q2_buffer_stress": {
+        "descripcion": "Filtrado por rango temporal en 'fecha' y ordenamiento descendente masivo por 'score_total' sin índice (Top-1000) para forzar y comparar volcados a disco y comportamiento de buffers (allowDiskUse en Mongo y work_mem en Postgres).",
+        "mongo_pipeline": "[{ '$match': { 'fecha': { '$gte': '2026-01-01T00:00:00Z' } } }, { '$sort': { 'score_total': -1 } }, { '$limit': 1000 }, { '$project': { 'user_id': 1, 'dominio_principal': 1, 'score_total': 1, 'nivel_riesgo': 1 } }]",
+        "postgres_sql": "SELECT data->>'user_id' AS user_id, data->>'dominio_principal' AS dominio_principal, (data->>'score_total')::numeric AS score_total, data->>'nivel_riesgo' AS nivel_riesgo FROM analisis WHERE (data->>'fecha')::timestamptz >= '2026-01-01 00:00:00Z' ORDER BY (data->>'score_total')::numeric DESC LIMIT 1000;"
+      }
+    }
   },
   "arquitectura_proyecto": {
     "descripcion_general": "Estructura modular orientada a reproducibilidad, telemetría de contenedor y desacoplamiento de dominio para evaluación bajo Docker cgroups v2.",
@@ -141,7 +157,7 @@
   "control_manual_usuario": {
     "aprobado_por_usuario": true,
     "esperar_confirmacion_fase": true,
-    "siguiente_accion_requerida": "Vincular repositorio remoto de GitHub, comitear primera versión y subir cambios"
+    "siguiente_accion_requerida": "Confirmar e implementar el generador sintético y las consultas Q1/Q2 para el dominio AntFish (colección analisis)"
   },
   "matriz_progreso": {
     "celda_piloto_completada": false,
