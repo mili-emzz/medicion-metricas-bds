@@ -1,0 +1,106 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: benchmark_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=benchmark_db
+    volumes:
+      - ./config/mongodb/init_mongo.js:/docker-entrypoint-initdb.d/init_mongo.js:ro
+      - mongo_data:/data/db
+    deploy:
+      resources:
+        limits:
+          cpus: '${BENCHMARK_CPUS:-4.0}'
+          memory: '${BENCHMARK_MEMORY:-4096m}'
+    mem_swappiness: 0
+    memswap_limit: '${BENCHMARK_MEM_SWAP:-4096m}'
+    networks:
+      - benchmark_net
+
+  postgresql:
+    image: postgres:16
+    container_name: benchmark_postgresql
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=benchmark_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ./config/postgres/init_postgres.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '${BENCHMARK_CPUS:-4.0}'
+          memory: '${BENCHMARK_MEMORY:-4096m}'
+    mem_swappiness: 0
+    memswap_limit: '${BENCHMARK_MEM_SWAP:-4096m}'
+    networks:
+      - benchmark_net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: benchmark_cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    networks:
+      - benchmark_net
+
+  node_exporter:
+    image: prom/node-exporter:v1.8.1
+    container_name: benchmark_node_exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    networks:
+      - benchmark_net
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: benchmark_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - benchmark_net
+
+networks:
+  benchmark_net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  postgres_data:
+  prometheus_data:
+
