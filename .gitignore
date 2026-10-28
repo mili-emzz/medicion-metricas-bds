@@ -12,8 +12,13 @@ venv/
 data/dataset.json
 data/*.jsonl
 *.dump
-config
-/docs
+
+# Variables de entorno y credenciales
+*.env
+.env*
+
+# Documentación interna y archivos de estado local
+docs/
 estado_proyecto.json
 plan_automatizacion_windows.md
 
