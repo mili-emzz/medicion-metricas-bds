@@ -12,6 +12,7 @@ venv/
 data/dataset.json
 data/*.jsonl
 *.dump
+config
 
 # Docker volumes locales
 mongo_data/
@@ -23,3 +24,4 @@ prometheus_data/
 .DS_Store
 Thumbs.db
 desktop.ini
+

@@ -1,0 +1,7 @@
+# Dependencias del Benchmark MongoDB vs PostgreSQL JSONB
+# Motor MongoDB
+pymongo>=4.6.0
+
+# Motor PostgreSQL
+psycopg2-binary>=2.9.9
+
