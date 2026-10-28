@@ -1,7 +1,9 @@
 {
   "proyecto_metadata": {
     "nombre": "Benchmark MongoDB vs PostgreSQL JSONB bajo contención de recursos",
-    "estado_fase_actual": "primera_version_implementada_pendiente_push",
+    "estado_fase_actual": "primera_version_publicada_en_github",
+    "repositorio_remoto": "https://github.com/mili-emzz/medicion-metricas-bds.git",
+    "rama_principal": "main",
     "dominio_datos": "ecommerce_modular",
     "ruta_dataset_generado": "./data/dataset.json",
     "fecha_actualizacion": "2026-10-27"
