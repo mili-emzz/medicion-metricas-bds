@@ -2,7 +2,7 @@ import time
 from typing import Dict, Any, Tuple
 
 class PostgresClientExecutor:
-    """Cliente de ejecución para consultas de PostgreSQL JSONB (Q1 y Q2)."""
+    """Cliente de ejecución para consultas de PostgreSQL JSONB en la tabla 'analisis' (Q1 y Q2)."""
 
     def __init__(
         self,
@@ -38,16 +38,25 @@ class PostgresClientExecutor:
             self._conn.close()
 
     def execute_q1(self) -> float:
-        """Ejecuta Q1 (Unwind, Filter & Grouping) y devuelve latencia en ms."""
+        """
+        Ejecuta Q1 (Unwind, Filter & Grouping sobre 'analisis') y devuelve latencia en ms.
+        Usa jsonb_array_elements para desanidar 'urls_extraidas', filtra score_total >= 50
+        y agrupa multidimensionalmente.
+        """
         sql = """
-        SELECT data->'customer'->'geo'->>'country' AS country,
-               item->>'category' AS category,
-               SUM((item->>'qty')::numeric * (item->>'price')::numeric) AS total_revenue,
-               AVG((item->>'qty')::numeric * (item->>'price')::numeric) AS avg_revenue,
-               COUNT(*) AS count
-        FROM orders, jsonb_array_elements(data->'items') AS item
-        WHERE (item->>'price')::numeric > 50
-        GROUP BY 1, 2;
+        SELECT
+            data->>'tipo_entrada'                         AS tipo_entrada,
+            data->>'nivel_riesgo'                         AS nivel_riesgo,
+            url_obj->>'dominio'                           AS dominio,
+            COUNT(*)                                      AS total_amenazas,
+            AVG((data->>'score_total')::numeric)          AS promedio_score,
+            AVG((data->'puntos_por_capa'->>'apis')::numeric)   AS promedio_puntos_apis,
+            AVG((data->'puntos_por_capa'->>'url')::numeric)    AS promedio_puntos_url,
+            AVG((data->'puntos_por_capa'->>'texto')::numeric)  AS promedio_puntos_texto
+        FROM analisis,
+             jsonb_array_elements(data->'urls_extraidas') AS url_obj
+        WHERE (data->>'score_total')::numeric >= 50
+        GROUP BY 1, 2, 3;
         """
         cur = self._conn.cursor()
         start = time.perf_counter()
@@ -58,24 +67,27 @@ class PostgresClientExecutor:
 
     def execute_q2(self, work_mem: str = "4MB") -> Tuple[float, bool]:
         """
-        Ejecuta Q2 (Massive Sort & Top-K) con configuración de work_mem.
+        Ejecuta Q2 (Massive Sort & Top-K sobre 'analisis') con ajuste dinámico de work_mem.
+        Filtra por fecha y ordena por score_total desc (campo sin índice) extrayendo Top-1000.
         Devuelve (latencia_ms, disk_spill_detected).
         """
         cur = self._conn.cursor()
         cur.execute(f"SET work_mem = '{work_mem}';")
-        
-        # Consulta para registrar temp_bytes antes
+
         cur.execute("SELECT temp_bytes FROM pg_stat_database WHERE datname = 'benchmark_db';")
         temp_before = cur.fetchone()[0] or 0
 
         sql = """
-        SELECT data->>'order_id' AS order_id,
-               data->'customer'->>'id' AS customer_id,
-               (data->'payment'->>'final_total')::numeric AS final_total
-        FROM orders
-        WHERE data->'payment'->>'status' = 'completed'
-          AND (data->>'timestamp')::timestamptz >= '2026-01-01 00:00:00Z'
-        ORDER BY (data->'payment'->>'final_total')::numeric DESC
+        SELECT
+            data->>'user_id'          AS user_id,
+            data->>'dominio_principal' AS dominio_principal,
+            (data->>'score_total')::numeric AS score_total,
+            data->>'nivel_riesgo'     AS nivel_riesgo,
+            data->>'tipo_entrada'     AS tipo_entrada,
+            (data->>'fecha')::timestamptz AS fecha
+        FROM analisis
+        WHERE (data->>'fecha')::timestamptz >= '2026-01-01 00:00:00Z'
+        ORDER BY (data->>'score_total')::numeric DESC
         LIMIT 1000;
         """
         start = time.perf_counter()
@@ -83,11 +95,9 @@ class PostgresClientExecutor:
         cur.fetchall()
         latency = (time.perf_counter() - start) * 1000.0
 
-        # Verificar si hubo incremento de temp_bytes (disk spill a archivos temporales de ordenamiento)
         cur.execute("SELECT temp_bytes FROM pg_stat_database WHERE datname = 'benchmark_db';")
         temp_after = cur.fetchone()[0] or 0
         cur.close()
 
         spill_detected = (temp_after > temp_before)
         return latency, spill_detected
-

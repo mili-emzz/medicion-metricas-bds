@@ -2,7 +2,7 @@
 """
 load_dataset.py
 Carga masiva por lotes (bulk insert) del dataset generado en MongoDB y PostgreSQL.
-Crea los esquemas e índices estipulados en la Sección 2 del Playbook.
+Crea la colección/tabla 'analisis' e índices según las reglas de AntFish.
 """
 
 import os
@@ -17,12 +17,11 @@ def load_to_mongo(file_path: str, uri: str = "mongodb://localhost:27017/", batch
     print(f"[*] Conectando a MongoDB en {uri}...")
     client = MongoClient(uri, serverSelectionTimeoutMS=5000)
     db = client["benchmark_db"]
-    collection = db["orders"]
+    collection = db["analisis"]
 
-    print("[*] Recreando colección e índices en MongoDB...")
+    print("[*] Recreando colección 'analisis' e índices en MongoDB...")
     collection.drop()
-    collection.create_index([("timestamp", 1)], name="idx_orders_timestamp")
-    collection.create_index([("order_id", 1)], name="idx_orders_order_id")
+    collection.create_index([("user_id", 1), ("fecha", -1), ("_id", -1)], name="idx_analisis_user_fecha_id")
 
     print(f"[*] Insertando registros desde {file_path} en MongoDB (lotes de {batch_size})...")
     start_time = time.time()
@@ -30,7 +29,6 @@ def load_to_mongo(file_path: str, uri: str = "mongodb://localhost:27017/", batch
     total_inserted = 0
 
     with open(file_path, "r", encoding="utf-8") as f:
-        # Detectar si es array JSON o JSON lines
         first_char = f.read(1)
         f.seek(0)
         if first_char == "[":
@@ -74,10 +72,10 @@ def load_to_postgres(file_path: str, host: str = "localhost", port: int = 5432, 
     conn.autocommit = False
     cur = conn.cursor()
 
-    print("[*] Recreando tabla orders e índice JSONB en PostgreSQL...")
-    cur.execute("DROP TABLE IF EXISTS orders CASCADE;")
-    cur.execute("CREATE TABLE orders (id UUID PRIMARY KEY, data JSONB NOT NULL);")
-    cur.execute("CREATE INDEX idx_orders_timestamp ON orders (((data->>'timestamp')::timestamptz));")
+    print("[*] Recreando tabla 'analisis' e índice JSONB en PostgreSQL...")
+    cur.execute("DROP TABLE IF EXISTS analisis CASCADE;")
+    cur.execute("CREATE TABLE analisis (id UUID PRIMARY KEY, data JSONB NOT NULL);")
+    cur.execute("CREATE INDEX idx_analisis_fecha ON analisis (((data->>'fecha')::timestamptz));")
     conn.commit()
 
     print(f"[*] Insertando registros desde {file_path} en PostgreSQL...")
@@ -85,7 +83,7 @@ def load_to_postgres(file_path: str, host: str = "localhost", port: int = 5432, 
     batch = []
     total_inserted = 0
 
-    insert_sql = "INSERT INTO orders (id, data) VALUES %s;"
+    insert_sql = "INSERT INTO analisis (id, data) VALUES %s;"
 
     with open(file_path, "r", encoding="utf-8") as f:
         first_char = f.read(1)
@@ -93,7 +91,7 @@ def load_to_postgres(file_path: str, host: str = "localhost", port: int = 5432, 
         if first_char == "[":
             records = json.load(f)
             for i in range(0, len(records), batch_size):
-                chunk = [(r["order_id"], json.dumps(r)) for r in records[i:i + batch_size]]
+                chunk = [(r.get("analisis_id") or r.get("id"), json.dumps(r)) for r in records[i:i + batch_size]]
                 execute_values(cur, insert_sql, chunk)
                 conn.commit()
                 total_inserted += len(chunk)
@@ -106,7 +104,8 @@ def load_to_postgres(file_path: str, host: str = "localhost", port: int = 5432, 
                 if line.endswith(","):
                     line = line[:-1]
                 rec = json.loads(line)
-                batch.append((rec["order_id"], json.dumps(rec)))
+                rec_id = rec.get("analisis_id") or rec.get("id")
+                batch.append((rec_id, json.dumps(rec)))
                 if len(batch) >= batch_size:
                     execute_values(cur, insert_sql, batch)
                     conn.commit()
@@ -124,7 +123,7 @@ def load_to_postgres(file_path: str, host: str = "localhost", port: int = 5432, 
     conn.close()
 
 def main():
-    parser = argparse.ArgumentParser(description="Carga masiva de datos sintéticos a MongoDB y PostgreSQL")
+    parser = argparse.ArgumentParser(description="Carga masiva de datos sintéticos a MongoDB y PostgreSQL (AntFish)")
     parser.add_argument("--file", "-f", type=str, default="./data/dataset.json", help="Ruta del archivo de dataset")
     parser.add_argument("--engine", "-e", type=str, default="both", choices=["both", "mongodb", "postgresql"])
     parser.add_argument("--batch-size", "-b", type=int, default=5000, help="Tamaño de lote")
@@ -144,4 +143,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

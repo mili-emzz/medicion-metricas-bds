@@ -4,10 +4,12 @@ import time
 from typing import Optional, Type
 from data_generator.base import BaseDatasetSchema
 from data_generator.schemas.ecommerce import EcommerceOrderSchema
+from data_generator.schemas.antfish import AntFishAnalisisSchema
 
 SCHEMA_REGISTRY = {
+    "antfish": AntFishAnalisisSchema,
     "ecommerce": EcommerceOrderSchema,
-    "default": EcommerceOrderSchema
+    "default": AntFishAnalisisSchema
 }
 
 def register_schema(name: str, schema_cls: Type[BaseDatasetSchema]):
@@ -20,7 +22,7 @@ class DatasetGenerator:
     """
 
     def __init__(self, schema: Optional[BaseDatasetSchema] = None):
-        self.schema = schema or EcommerceOrderSchema()
+        self.schema = schema or AntFishAnalisisSchema()
 
     def generate_to_file(self, output_path: str, total_records: int = 500000, batch_size: int = 10000):
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
@@ -64,4 +66,3 @@ class DatasetGenerator:
         total_elapsed = time.time() - start_time
         print(f"\n[+] Generación completa en {total_elapsed:.2f}s. Guardado en: {output_path}")
         return output_path
-

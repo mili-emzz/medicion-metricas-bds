@@ -35,8 +35,8 @@ def main():
         "--schema", "-s",
         type=str,
         choices=list(SCHEMA_REGISTRY.keys()),
-        default="ecommerce",
-        help="Nombre del esquema a instanciar (default: ecommerce)"
+        default="antfish",
+        help="Nombre del esquema a instanciar (default: antfish)"
     )
     parser.add_argument(
         "--seed",
@@ -48,7 +48,7 @@ def main():
     args = parser.parse_args()
 
     schema_cls = SCHEMA_REGISTRY[args.schema]
-    schema_instance = schema_cls(seed=args.seed)
+    schema_instance = schema_cls()
 
     generator = DatasetGenerator(schema=schema_instance)
     generator.generate_to_file(
@@ -59,4 +59,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

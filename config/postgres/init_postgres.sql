@@ -1,14 +1,13 @@
--- Inicialización de PostgreSQL para Benchmark JSONB
+-- Inicialización de PostgreSQL para Benchmark AntFish JSONB
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS analisis CASCADE;
 
-CREATE TABLE orders (
+CREATE TABLE analisis (
     id UUID PRIMARY KEY,
     data JSONB NOT NULL
 );
 
--- Índice B-Tree sobre timestamp extraído de JSONB especificado en el Playbook (Sección 2)
-CREATE INDEX IF NOT EXISTS idx_orders_timestamp 
-ON orders (((data->>'timestamp')::timestamptz));
-
+-- Índice B-Tree sobre campo temporal extraído de JSONB
+CREATE INDEX IF NOT EXISTS idx_analisis_fecha 
+ON analisis (((data->>'fecha')::timestamptz));
