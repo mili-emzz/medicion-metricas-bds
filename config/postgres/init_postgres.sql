@@ -10,4 +10,4 @@ CREATE TABLE analisis (
 
 -- Índice B-Tree sobre campo temporal extraído de JSONB
 CREATE INDEX IF NOT EXISTS idx_analisis_fecha 
-ON analisis (((data->>'fecha')::timestamptz));
+ON analisis ((data->>'fecha'));

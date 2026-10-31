@@ -16,9 +16,9 @@ SELECT
     (data->>'score_total')::numeric AS score_total,
     data->>'nivel_riesgo'     AS nivel_riesgo,
     data->>'tipo_entrada'     AS tipo_entrada,
-    (data->>'fecha')::timestamptz AS fecha
+    data->>'fecha'            AS fecha
 FROM analisis
-WHERE (data->>'fecha')::timestamptz >= '2026-01-01 00:00:00Z'
+WHERE (data->>'fecha') >= '2026-01-01T00:00:00Z'
 ORDER BY (data->>'score_total')::numeric DESC
 LIMIT 1000;
 

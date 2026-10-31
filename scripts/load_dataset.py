@@ -59,7 +59,11 @@ def load_to_mongo(file_path: str, uri: str = "mongodb://localhost:27017/", batch
     print(f"\n[+] MongoDB: {total_inserted} registros cargados en {elapsed:.2f}s ({total_inserted/elapsed:.1f} rec/s).")
     client.close()
 
-def load_to_postgres(file_path: str, host: str = "localhost", port: int = 5432, batch_size: int = 5000):
+def load_to_postgres(file_path: str, host: str = None, port: int = None, batch_size: int = 5000):
+    if host is None:
+        host = os.environ.get("POSTGRES_HOST", "localhost")
+    if port is None:
+        port = int(os.environ.get("POSTGRES_PORT", "5432"))
     try:
         import psycopg2
         from psycopg2.extras import execute_values
@@ -75,7 +79,7 @@ def load_to_postgres(file_path: str, host: str = "localhost", port: int = 5432, 
     print("[*] Recreando tabla 'analisis' e índice JSONB en PostgreSQL...")
     cur.execute("DROP TABLE IF EXISTS analisis CASCADE;")
     cur.execute("CREATE TABLE analisis (id UUID PRIMARY KEY, data JSONB NOT NULL);")
-    cur.execute("CREATE INDEX idx_analisis_fecha ON analisis (((data->>'fecha')::timestamptz));")
+    cur.execute("CREATE INDEX idx_analisis_fecha ON analisis ((data->>'fecha'));")
     conn.commit()
 
     print(f"[*] Insertando registros desde {file_path} en PostgreSQL...")
@@ -127,6 +131,8 @@ def main():
     parser.add_argument("--file", "-f", type=str, default="./data/dataset.json", help="Ruta del archivo de dataset")
     parser.add_argument("--engine", "-e", type=str, default="both", choices=["both", "mongodb", "postgresql"])
     parser.add_argument("--batch-size", "-b", type=int, default=5000, help="Tamaño de lote")
+    parser.add_argument("--host", type=str, default=None, help="Host para PostgreSQL")
+    parser.add_argument("--port", "-p", type=int, default=None, help="Puerto para PostgreSQL")
 
     args = parser.parse_args()
 
@@ -139,7 +145,7 @@ def main():
         load_to_mongo(args.file, batch_size=args.batch_size)
 
     if args.engine in ["both", "postgresql"]:
-        load_to_postgres(args.file, batch_size=args.batch_size)
+        load_to_postgres(args.file, host=args.host, port=args.port, batch_size=args.batch_size)
 
 if __name__ == "__main__":
     main()

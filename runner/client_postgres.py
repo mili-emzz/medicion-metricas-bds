@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Dict, Any, Tuple
 
@@ -6,15 +7,15 @@ class PostgresClientExecutor:
 
     def __init__(
         self,
-        host: str = "localhost",
-        port: int = 5432,
+        host: str = None,
+        port: int = None,
         dbname: str = "benchmark_db",
         user: str = "postgres",
         password: str = "postgres"
     ):
         self.conn_params = {
-            "host": host,
-            "port": port,
+            "host": host or os.environ.get("POSTGRES_HOST", "localhost"),
+            "port": port or int(os.environ.get("POSTGRES_PORT", "5432")),
             "dbname": dbname,
             "user": user,
             "password": password
@@ -84,9 +85,9 @@ class PostgresClientExecutor:
             (data->>'score_total')::numeric AS score_total,
             data->>'nivel_riesgo'     AS nivel_riesgo,
             data->>'tipo_entrada'     AS tipo_entrada,
-            (data->>'fecha')::timestamptz AS fecha
+            data->>'fecha'            AS fecha
         FROM analisis
-        WHERE (data->>'fecha')::timestamptz >= '2026-01-01 00:00:00Z'
+        WHERE (data->>'fecha') >= '2026-01-01T00:00:00Z'
         ORDER BY (data->>'score_total')::numeric DESC
         LIMIT 1000;
         """
